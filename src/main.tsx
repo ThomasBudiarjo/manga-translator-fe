@@ -6,7 +6,10 @@ import { ClerkProvider } from "@clerk/react";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ClerkProvider afterSignOutUrl="/">
+    <ClerkProvider
+      afterSignOutUrl="/"
+      publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY}
+    >
       <App />
     </ClerkProvider>
   </StrictMode>,
