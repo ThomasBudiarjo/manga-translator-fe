@@ -35,7 +35,7 @@ export function Header() {
             </SignUpButton>
           </Show>
           <Show when="signed-in">
-            <UserButton afterSignOutUrl="/" />
+            <UserButton />
           </Show>
         </div>
       </div>
