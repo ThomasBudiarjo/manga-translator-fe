@@ -1,7 +1,7 @@
-import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/react";
+import { SignInButton, SignUpButton } from "@clerk/react";
 import { Link } from "react-router-dom";
 
-export function Header() {
+export function PublicHeader() {
   return (
     <header className="sticky top-0 z-20 border-b border-rule bg-paper/85 backdrop-blur supports-[backdrop-filter]:bg-paper/70">
       <div className="mx-auto w-full max-w-[1240px] px-6 h-16 flex items-center justify-between">
@@ -23,21 +23,22 @@ export function Header() {
         </Link>
 
         <div className="flex items-center gap-1">
-          <Show when="signed-out">
-            <SignInButton mode="modal">
-              <button className="h-9 px-3 text-[13px] font-medium text-ink-soft hover:text-ink transition-colors">
-                Sign in
-              </button>
-            </SignInButton>
-            <SignUpButton mode="modal">
-              <button className="h-9 px-4 text-[12px] font-medium uppercase tracking-tight bg-ink text-paper rounded-button hover:bg-vermilion transition-colors">
-                Get started
-              </button>
-            </SignUpButton>
-          </Show>
-          <Show when="signed-in">
-            <UserButton />
-          </Show>
+          <SignInButton mode="modal">
+            <button
+              type="button"
+              className="h-9 px-3 text-[13px] font-medium text-ink-soft hover:text-ink transition-colors"
+            >
+              Sign in
+            </button>
+          </SignInButton>
+          <SignUpButton mode="modal">
+            <button
+              type="button"
+              className="h-9 px-4 text-[12px] font-medium uppercase tracking-tight bg-ink text-paper rounded-button hover:bg-vermilion transition-colors"
+            >
+              Get started
+            </button>
+          </SignUpButton>
         </div>
       </div>
     </header>

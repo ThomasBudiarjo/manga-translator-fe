@@ -1,4 +1,4 @@
-import { Show, SignInButton, SignUpButton } from '@clerk/react'
+import { SignInButton, SignUpButton } from '@clerk/react'
 
 const STEPS = [
   { title: 'Drop a page', body: 'JPEG or PNG, up to 10 MB.' },
@@ -28,21 +28,25 @@ export function Hero() {
             and re-renders the page so it reads like the original.
           </p>
           <div className="mt-10 flex items-center gap-3">
-            <Show when="signed-out">
-              <SignUpButton mode="modal">
-                <button className="h-12 px-6 text-[13px] font-medium uppercase tracking-tight bg-ink text-paper rounded-button hover:bg-vermilion transition-colors inline-flex items-center gap-2">
-                  Get started — it's free
-                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.75">
-                    <path d="M3 8h10m0 0l-4-4m4 4l-4 4" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              </SignUpButton>
-              <SignInButton mode="modal">
-                <button className="h-12 px-4 text-[13px] font-medium text-ink-soft hover:text-ink transition-colors">
-                  I have an account
-                </button>
-              </SignInButton>
-            </Show>
+            <SignUpButton mode="modal">
+              <button
+                type="button"
+                className="h-12 px-6 text-[13px] font-medium uppercase tracking-tight bg-ink text-paper rounded-button hover:bg-vermilion transition-colors inline-flex items-center gap-2"
+              >
+                Get started — it's free
+                <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.75">
+                  <path d="M3 8h10m0 0l-4-4m4 4l-4 4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </SignUpButton>
+            <SignInButton mode="modal">
+              <button
+                type="button"
+                className="h-12 px-4 text-[13px] font-medium text-ink-soft hover:text-ink transition-colors"
+              >
+                I have an account
+              </button>
+            </SignInButton>
           </div>
         </div>
 
