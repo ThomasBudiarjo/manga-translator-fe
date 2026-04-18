@@ -31,6 +31,7 @@ export function Translator() {
 
   const loading = state.kind === 'loading'
   const externalError = state.kind === 'error' ? state.message : null
+  const externalRateLimit = state.kind === 'error' ? state.rateLimit : undefined
 
   return (
     <section className="mx-auto w-full max-w-[1320px] px-6 py-10 md:py-14">
@@ -44,7 +45,12 @@ export function Translator() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
-        <UploadCard onSubmit={handleSubmit} loading={loading} externalError={externalError} />
+        <UploadCard
+          onSubmit={handleSubmit}
+          loading={loading}
+          externalError={externalError}
+          externalRateLimit={externalRateLimit}
+        />
         {state.kind === 'success' && submitted ? (
           <ResultCard
             result={state.data}

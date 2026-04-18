@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '@clerk/react'
 import { ApiError, checkHealth, translateImage } from '../lib/api'
-import type { TranslateJsonResponse } from '../lib/api'
+import type { RateLimitInfo, TranslateJsonResponse } from '../lib/api'
 
 export type TranslateState =
   | { kind: 'idle' }
   | { kind: 'loading' }
   | { kind: 'success'; data: TranslateJsonResponse; resultUrl: string }
-  | { kind: 'error'; message: string }
+  | { kind: 'error'; message: string; rateLimit?: RateLimitInfo }
 
 const TIMEOUT_MS = 130_000
 
@@ -62,7 +62,8 @@ export function useTranslate() {
       } catch (err) {
         const message =
           err instanceof ApiError ? err.friendly : 'Something went wrong. Please try again.'
-        setState({ kind: 'error', message })
+        const rateLimit = err instanceof ApiError ? err.rateLimit : undefined
+        setState({ kind: 'error', message, rateLimit })
       } finally {
         window.clearTimeout(timeout)
       }

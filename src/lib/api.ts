@@ -1,3 +1,5 @@
+import { formatRetryAfter } from './format'
+
 const BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? ''
 
 export type Region = {
@@ -20,14 +22,23 @@ export type TranslateInput = {
   signal?: AbortSignal
 }
 
+export type RateLimitInfo = {
+  plan: string
+  limit: number | null
+  retryAfter: number
+  upgradeable: boolean
+}
+
 export class ApiError extends Error {
   status: number
   friendly: string
-  constructor(status: number, friendly: string, message?: string) {
+  rateLimit?: RateLimitInfo
+  constructor(status: number, friendly: string, message?: string, rateLimit?: RateLimitInfo) {
     super(message ?? friendly)
     this.name = 'ApiError'
     this.status = status
     this.friendly = friendly
+    this.rateLimit = rateLimit
   }
 }
 
@@ -51,33 +62,11 @@ function friendlyForStatus(status: number): string {
   }
 }
 
-function formatRetryAfter(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds <= 0) return 'a moment'
-  if (seconds < 60) return `${Math.ceil(seconds)}s`
-  const minutes = Math.ceil(seconds / 60)
-  if (minutes < 60) return `${minutes} min`
-  const hours = Math.floor(minutes / 60)
-  const mins = minutes % 60
-  return mins ? `${hours}h ${mins}m` : `${hours}h`
-}
-
-function friendlyForRateLimit(body: {
-  plan?: string
-  limit?: number
-  retry_after?: number
-}, retryAfterHeader: string | null): string {
-  const retrySeconds =
-    typeof body.retry_after === 'number'
-      ? body.retry_after
-      : retryAfterHeader
-      ? Number(retryAfterHeader)
-      : 0
-  const wait = formatRetryAfter(retrySeconds)
-  const limit = body.limit
-  const plan = body.plan
+function friendlyForRateLimit(info: RateLimitInfo): string {
+  const wait = formatRetryAfter(info.retryAfter)
   const base =
-    typeof limit === 'number'
-      ? `Hourly limit reached (${limit} translations${plan ? `, ${plan} plan` : ''}).`
+    info.limit !== null
+      ? `Hourly limit reached (${info.limit} translations, ${info.plan} plan).`
       : "You've hit the hourly translation limit."
   return `${base} Try again in ${wait}.`
 }
@@ -111,17 +100,40 @@ export async function translateImage(input: TranslateInput): Promise<TranslateJs
 
   if (!res.ok) {
     let serverMsg = ''
-    let body: { error?: string; plan?: string; limit?: number; retry_after?: number } = {}
+    let body: {
+      error?: string
+      message?: string
+      plan?: string
+      limit?: number
+      retry_after?: number
+      upgradeable?: boolean
+    } = {}
     try {
       body = (await res.json()) as typeof body
       serverMsg = body?.error ?? ''
     } catch {
       /* swallow */
     }
-    const friendly =
-      res.status === 429
-        ? friendlyForRateLimit(body, res.headers.get('Retry-After'))
-        : friendlyForStatus(res.status)
+    if (res.status === 429) {
+      const retryHeader = res.headers.get('Retry-After')
+      const rateLimit: RateLimitInfo = {
+        plan: body.plan ?? 'free',
+        limit: typeof body.limit === 'number' ? body.limit : null,
+        retryAfter:
+          typeof body.retry_after === 'number'
+            ? body.retry_after
+            : retryHeader
+            ? Number(retryHeader)
+            : 0,
+        upgradeable:
+          typeof body.upgradeable === 'boolean'
+            ? body.upgradeable
+            : (body.plan ?? 'free') === 'free',
+      }
+      const friendly = body.message ? `${body.message} Try again in ${formatRetryAfter(rateLimit.retryAfter)}.` : friendlyForRateLimit(rateLimit)
+      throw new ApiError(res.status, friendly, serverMsg, rateLimit)
+    }
+    const friendly = friendlyForStatus(res.status)
     throw new ApiError(res.status, friendly, serverMsg)
   }
 

@@ -1,18 +1,23 @@
 import { useEffect, useState } from 'react'
+import type { RateLimitInfo } from '../lib/api'
+import { formatRetryAfter } from '../lib/format'
 import { Dropzone } from './Dropzone'
 import { LanguagePicker } from './LanguagePicker'
 import { Button } from './ui/Button'
 import { Card } from './ui/Card'
 
 const STORAGE_KEY = 'mangaku.langs.v1'
+const UPGRADE_MAILTO =
+  'mailto:thomas@cryowerx.com?subject=Upgrade%20manga-translator%20plan&body=Hi%2C%20I%27d%20like%20to%20upgrade%20my%20plan.'
 
 type Props = {
   onSubmit: (file: File, src: string, tgt: string) => void
   loading: boolean
   externalError?: string | null
+  externalRateLimit?: RateLimitInfo
 }
 
-export function UploadCard({ onSubmit, loading, externalError }: Props) {
+export function UploadCard({ onSubmit, loading, externalError, externalRateLimit }: Props) {
   const [file, setFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -92,14 +97,16 @@ export function UploadCard({ onSubmit, loading, externalError }: Props) {
         <LanguagePicker id="tgt-lang" label="To" value={tgt} onChange={setTgt} disabled={loading} />
       </div>
 
-      {displayError && (
+      {externalRateLimit ? (
+        <RateLimitBanner info={externalRateLimit} />
+      ) : displayError ? (
         <div className="mt-6 flex items-start gap-3 border-l-2 border-vermilion bg-vermilion-soft px-4 py-3 text-[13px] text-ink-soft">
           <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-vermilion-deep mt-0.5">
             err
           </span>
           <span>{displayError}</span>
         </div>
-      )}
+      ) : null}
 
       <div className="mt-7 flex items-center justify-between gap-4">
         <p className="hidden sm:block font-mono text-[10px] uppercase tracking-[0.22em] text-ink-muted">
@@ -115,5 +122,45 @@ export function UploadCard({ onSubmit, loading, externalError }: Props) {
         </Button>
       </div>
     </Card>
+  )
+}
+
+function RateLimitBanner({ info }: { info: RateLimitInfo }) {
+  const wait = formatRetryAfter(info.retryAfter)
+  const planLabel = info.plan.charAt(0).toUpperCase() + info.plan.slice(1)
+  const quota = info.limit !== null ? `${info.limit} / hr` : 'hourly quota'
+
+  return (
+    <div className="mt-6 border-l-2 border-warning bg-warning-soft px-4 py-4 text-[13px] text-ink-soft">
+      <div className="flex items-start gap-3">
+        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-warning mt-0.5">
+          limit
+        </span>
+        <div className="flex-1">
+          <p className="font-display text-[18px] leading-tight text-ink">
+            Hourly translation limit reached
+          </p>
+          <p className="mt-1.5 text-ink-soft">
+            {planLabel} plan · {quota}. Try again in <span className="font-mono text-ink">{wait}</span>.
+          </p>
+          {info.upgradeable && (
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <a
+                href={UPGRADE_MAILTO}
+                className="inline-flex items-center justify-center gap-2 rounded-button font-medium uppercase tracking-tight transition-colors duration-150 bg-ink text-paper hover:bg-vermilion h-8 px-3 text-[12px]"
+              >
+                Upgrade plan
+                <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.75">
+                  <path d="M3 8h10m0 0l-4-4m4 4l-4 4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </a>
+              <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-ink-muted">
+                more translations, fewer waits
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }
