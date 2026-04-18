@@ -36,9 +36,12 @@ function friendlyForStatus(status: number): string {
     case 400:
       return "That image couldn't be processed. Try a JPEG or PNG under 10 MB."
     case 401:
+    case 403:
       return 'Session expired — please sign in again.'
     case 413:
       return 'That image is too large. Max 10 MB.'
+    case 429:
+      return "You've hit the hourly translation limit. Please try again later."
     case 503:
       return 'Server is busy. Try again in a moment.'
     case 504:
@@ -46,6 +49,37 @@ function friendlyForStatus(status: number): string {
     default:
       return 'Something went wrong. Please try again.'
   }
+}
+
+function formatRetryAfter(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) return 'a moment'
+  if (seconds < 60) return `${Math.ceil(seconds)}s`
+  const minutes = Math.ceil(seconds / 60)
+  if (minutes < 60) return `${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  const mins = minutes % 60
+  return mins ? `${hours}h ${mins}m` : `${hours}h`
+}
+
+function friendlyForRateLimit(body: {
+  plan?: string
+  limit?: number
+  retry_after?: number
+}, retryAfterHeader: string | null): string {
+  const retrySeconds =
+    typeof body.retry_after === 'number'
+      ? body.retry_after
+      : retryAfterHeader
+      ? Number(retryAfterHeader)
+      : 0
+  const wait = formatRetryAfter(retrySeconds)
+  const limit = body.limit
+  const plan = body.plan
+  const base =
+    typeof limit === 'number'
+      ? `Hourly limit reached (${limit} translations${plan ? `, ${plan} plan` : ''}).`
+      : "You've hit the hourly translation limit."
+  return `${base} Try again in ${wait}.`
 }
 
 export async function translateImage(input: TranslateInput): Promise<TranslateJsonResponse> {
@@ -69,18 +103,26 @@ export async function translateImage(input: TranslateInput): Promise<TranslateJs
     if (input.signal?.aborted) {
       throw new ApiError(0, 'That page took too long. Try a smaller or simpler image.')
     }
+    if (import.meta.env.DEV) {
+      console.error('[translate] fetch failed — likely CORS or network:', err)
+    }
     throw new ApiError(0, "Couldn't reach the server. Check your connection.", String(err))
   }
 
   if (!res.ok) {
     let serverMsg = ''
+    let body: { error?: string; plan?: string; limit?: number; retry_after?: number } = {}
     try {
-      const data = await res.json() as { error?: string }
-      serverMsg = data?.error ?? ''
+      body = (await res.json()) as typeof body
+      serverMsg = body?.error ?? ''
     } catch {
       /* swallow */
     }
-    throw new ApiError(res.status, friendlyForStatus(res.status), serverMsg)
+    const friendly =
+      res.status === 429
+        ? friendlyForRateLimit(body, res.headers.get('Retry-After'))
+        : friendlyForStatus(res.status)
+    throw new ApiError(res.status, friendly, serverMsg)
   }
 
   return await res.json() as TranslateJsonResponse

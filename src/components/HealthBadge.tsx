@@ -9,11 +9,10 @@ export function HealthBadge() {
   const [info, setInfo] = useState<HealthResponse | null>(null)
 
   useEffect(() => {
+    const ctrl = new AbortController()
     let cancelled = false
-    let timer: number | undefined
 
-    const tick = async () => {
-      const ctrl = new AbortController()
+    ;(async () => {
       try {
         const data = await checkHealth(ctrl.signal)
         if (cancelled) return
@@ -24,12 +23,11 @@ export function HealthBadge() {
         setStatus('down')
         setInfo(null)
       }
-      if (!cancelled) timer = window.setTimeout(tick, 30_000)
-    }
-    tick()
+    })()
+
     return () => {
       cancelled = true
-      if (timer) window.clearTimeout(timer)
+      ctrl.abort()
     }
   }, [])
 

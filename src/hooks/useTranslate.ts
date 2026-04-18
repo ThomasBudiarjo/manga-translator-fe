@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '@clerk/react'
-import { ApiError, translateImage } from '../lib/api'
+import { ApiError, checkHealth, translateImage } from '../lib/api'
 import type { TranslateJsonResponse } from '../lib/api'
 
 export type TranslateState =
@@ -42,6 +42,17 @@ export function useTranslate() {
       setState({ kind: 'loading' })
       try {
         const token = await getToken()
+        try {
+          await checkHealth(ctrl.signal)
+        } catch {
+          if (ctrl.signal.aborted) return
+          setState({
+            kind: 'error',
+            message: "Couldn't reach the server. Check your connection.",
+          })
+          window.clearTimeout(timeout)
+          return
+        }
         const data = await translateImage({ file, srcLang, tgtLang, token, signal: ctrl.signal })
         const blob = base64ToBlob(data.image, 'image/png')
         const resultUrl = URL.createObjectURL(blob)
