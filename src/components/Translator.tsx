@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { UploadCard } from './UploadCard'
 import { ResultCard } from './ResultCard'
 import { useTranslate } from '../hooks/useTranslate'
+import type { JobStep } from '../lib/api'
 
 type Submitted = { file: File; url: string }
 
@@ -54,7 +55,6 @@ export function Translator() {
         {state.kind === 'success' && submitted ? (
           <ResultCard
             result={state.data}
-            resultUrl={state.resultUrl}
             originalUrl={submitted.url}
             originalName={submitted.file.name}
             onReset={handleReset}
@@ -68,6 +68,7 @@ export function Translator() {
                 ? 'error'
                 : 'idle'
             }
+            step={state.kind === 'loading' ? state.step : undefined}
           />
         )}
       </div>
@@ -75,7 +76,23 @@ export function Translator() {
   )
 }
 
-function PendingCard({ kind }: { kind: 'idle' | 'loading' | 'error' }) {
+function PendingCard({ kind, step }: { kind: 'idle' | 'loading' | 'error'; step?: JobStep }) {
+  const phaseLabel = (() => {
+    if (kind !== 'loading') {
+      return kind === 'error' ? 'see the message on the left' : 'drop a page on the left'
+    }
+    switch (step) {
+      case 'ocr':
+        return 'detect · running ocr'
+      case 'translate':
+        return 'translate · llm working'
+      case 'typeset':
+        return 'render · typesetting'
+      default:
+        return 'queued · waiting for worker'
+    }
+  })()
+
   return (
     <div className="border border-dashed border-rule rounded-card grid place-items-center text-center min-h-[480px] p-8 bg-surface/50">
       <div className="max-w-[28ch]">
@@ -94,11 +111,7 @@ function PendingCard({ kind }: { kind: 'idle' | 'loading' | 'error' }) {
             : 'Awaiting a page'}
         </p>
         <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.22em] text-ink-muted">
-          {kind === 'loading'
-            ? 'detect · translate · render'
-            : kind === 'error'
-            ? 'see the message on the left'
-            : 'drop a page on the left'}
+          {phaseLabel}
         </p>
       </div>
     </div>

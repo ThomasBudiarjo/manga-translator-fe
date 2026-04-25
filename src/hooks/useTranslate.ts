@@ -1,34 +1,38 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '@clerk/react'
-import { ApiError, checkHealth, translateImage } from '../lib/api'
-import type { RateLimitInfo, TranslateJsonResponse } from '../lib/api'
+import {
+  ApiError,
+  checkHealth,
+  pollJobStatus,
+  submitTranslate,
+} from '../lib/api'
+import type {
+  JobStatusResponse,
+  JobStep,
+  RateLimitInfo,
+  Region,
+} from '../lib/api'
+
+export type TranslateSuccess = {
+  imageUrl: string
+  regions: Region[]
+  warning?: string
+}
 
 export type TranslateState =
   | { kind: 'idle' }
-  | { kind: 'loading' }
-  | { kind: 'success'; data: TranslateJsonResponse; resultUrl: string }
+  | { kind: 'loading'; step?: JobStep }
+  | { kind: 'success'; data: TranslateSuccess }
   | { kind: 'error'; message: string; rateLimit?: RateLimitInfo }
-
-const TIMEOUT_MS = 130_000
-
-function base64ToBlob(b64: string, mime: string): Blob {
-  const bin = atob(b64)
-  const len = bin.length
-  const buf = new Uint8Array(len)
-  for (let i = 0; i < len; i++) buf[i] = bin.charCodeAt(i)
-  return new Blob([buf], { type: mime })
-}
 
 export function useTranslate() {
   const { getToken } = useAuth()
   const [state, setState] = useState<TranslateState>({ kind: 'idle' })
   const abortRef = useRef<AbortController | null>(null)
-  const resultUrlRef = useRef<string | null>(null)
 
   useEffect(() => {
     return () => {
       abortRef.current?.abort()
-      if (resultUrlRef.current) URL.revokeObjectURL(resultUrlRef.current)
     }
   }, [])
 
@@ -37,7 +41,6 @@ export function useTranslate() {
       abortRef.current?.abort()
       const ctrl = new AbortController()
       abortRef.current = ctrl
-      const timeout = window.setTimeout(() => ctrl.abort(), TIMEOUT_MS)
 
       setState({ kind: 'loading' })
       try {
@@ -50,22 +53,45 @@ export function useTranslate() {
             kind: 'error',
             message: "Couldn't reach the server. Check your connection.",
           })
-          window.clearTimeout(timeout)
           return
         }
-        const data = await translateImage({ file, srcLang, tgtLang, token, signal: ctrl.signal })
-        const blob = base64ToBlob(data.image, 'image/png')
-        const resultUrl = URL.createObjectURL(blob)
-        if (resultUrlRef.current) URL.revokeObjectURL(resultUrlRef.current)
-        resultUrlRef.current = resultUrl
-        setState({ kind: 'success', data, resultUrl })
+
+        const submitted = await submitTranslate({
+          file,
+          srcLang,
+          tgtLang,
+          token,
+          signal: ctrl.signal,
+        })
+
+        const final: JobStatusResponse = await pollJobStatus(submitted.job_id, token, {
+          signal: ctrl.signal,
+          onUpdate: (status) => {
+            if (ctrl.signal.aborted) return
+            if (status.status === 'running' || status.status === 'queued') {
+              setState({ kind: 'loading', step: status.step })
+            }
+          },
+        })
+
+        if (!final.image_url) {
+          setState({ kind: 'error', message: 'Translation finished but no image was returned.' })
+          return
+        }
+        setState({
+          kind: 'success',
+          data: {
+            imageUrl: final.image_url,
+            regions: final.regions ?? [],
+            warning: final.warning,
+          },
+        })
       } catch (err) {
+        if (ctrl.signal.aborted) return
         const message =
           err instanceof ApiError ? err.friendly : 'Something went wrong. Please try again.'
         const rateLimit = err instanceof ApiError ? err.rateLimit : undefined
         setState({ kind: 'error', message, rateLimit })
-      } finally {
-        window.clearTimeout(timeout)
       }
     },
     [getToken],
@@ -73,8 +99,6 @@ export function useTranslate() {
 
   const reset = useCallback(() => {
     abortRef.current?.abort()
-    if (resultUrlRef.current) URL.revokeObjectURL(resultUrlRef.current)
-    resultUrlRef.current = null
     setState({ kind: 'idle' })
   }, [])
 

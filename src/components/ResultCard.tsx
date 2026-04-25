@@ -2,19 +2,18 @@ import { useState } from 'react'
 import { Card } from './ui/Card'
 import { Button } from './ui/Button'
 import { RegionList } from './RegionList'
-import type { TranslateJsonResponse } from '../lib/api'
+import type { TranslateSuccess } from '../hooks/useTranslate'
 
 type Tab = 'translated' | 'original' | 'regions'
 
 type Props = {
-  result: TranslateJsonResponse
-  resultUrl: string
+  result: TranslateSuccess
   originalUrl: string
   originalName: string
   onReset: () => void
 }
 
-export function ResultCard({ result, resultUrl, originalUrl, originalName, onReset }: Props) {
+export function ResultCard({ result, originalUrl, originalName, onReset }: Props) {
   const [tab, setTab] = useState<Tab>('translated')
 
   const tabs: { key: Tab; label: string; count?: number }[] = [
@@ -25,8 +24,10 @@ export function ResultCard({ result, resultUrl, originalUrl, originalName, onRes
 
   const handleDownload = () => {
     const a = document.createElement('a')
-    a.href = resultUrl
+    a.href = result.imageUrl
     a.download = `translated-${originalName.replace(/\.[^.]+$/, '')}.png`
+    a.target = '_blank'
+    a.rel = 'noopener'
     document.body.appendChild(a)
     a.click()
     a.remove()
@@ -78,7 +79,7 @@ export function ResultCard({ result, resultUrl, originalUrl, originalName, onRes
         {tab === 'translated' && (
           <div className="bg-paper-deep rounded-card p-3 grid place-items-center">
             <img
-              src={resultUrl}
+              src={result.imageUrl}
               alt="Translated manga page"
               className="max-h-[68vh] max-w-full object-contain"
             />
