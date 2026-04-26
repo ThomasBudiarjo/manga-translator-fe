@@ -64,7 +64,7 @@ export function useTranslate() {
           signal: ctrl.signal,
         })
 
-        const final: JobStatusResponse = await pollJobStatus(submitted.job_id, token, {
+        const final: JobStatusResponse = await pollJobStatus(submitted.job_id, getToken, {
           signal: ctrl.signal,
           onUpdate: (status) => {
             if (ctrl.signal.aborted) return

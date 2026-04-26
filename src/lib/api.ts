@@ -59,8 +59,9 @@ function friendlyForStatus(status: number): string {
     case 400:
       return "That image couldn't be processed. Try a JPEG or PNG under 10 MB."
     case 401:
-    case 403:
       return 'Session expired — please sign in again.'
+    case 403:
+      return 'You do not have access to this translation job.'
     case 413:
       return 'That image is too large. Max 10 MB.'
     case 429:
@@ -169,12 +170,22 @@ export async function submitTranslate(input: SubmitTranslateInput): Promise<Subm
   return (await res.json()) as SubmitResponse
 }
 
+type TokenSource = string | null | (() => Promise<string | null>)
+
+async function resolveToken(tokenSource: TokenSource): Promise<string | null> {
+  if (typeof tokenSource === 'function') {
+    return await tokenSource()
+  }
+  return tokenSource
+}
+
 export async function getJobStatus(
   jobId: string,
-  token: string | null,
+  tokenSource: TokenSource,
   signal?: AbortSignal,
 ): Promise<JobStatusResponse> {
   const headers: Record<string, string> = {}
+  const token = await resolveToken(tokenSource)
   if (token) headers['Authorization'] = `Bearer ${token}`
 
   const res = await fetch(`${BASE_URL}/jobs/${encodeURIComponent(jobId)}`, {
@@ -200,7 +211,7 @@ export type PollOptions = {
 // `failed` or transport errors.
 export async function pollJobStatus(
   jobId: string,
-  token: string | null,
+  tokenSource: TokenSource,
   opts: PollOptions = {},
 ): Promise<JobStatusResponse> {
   const interval = opts.intervalMs ?? 2000
@@ -208,7 +219,7 @@ export async function pollJobStatus(
     if (opts.signal?.aborted) {
       throw new ApiError(0, 'Cancelled.')
     }
-    const status = await getJobStatus(jobId, token, opts.signal)
+    const status = await getJobStatus(jobId, tokenSource, opts.signal)
     opts.onUpdate?.(status)
     if (status.status === 'done') return status
     if (status.status === 'failed') {
